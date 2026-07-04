@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/translate.ts": {
+      "runtime": "@vercel/node@3"
+    }
+  }
+}
