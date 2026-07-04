@@ -128,16 +128,9 @@ kaoyan-reader/
 
 项目是纯静态站点，可部署到任意静态托管服务：
 
-### GitHub Pages
+项目已配置好 GitHub Pages，推送到 `master` 后 Actions 自动部署。
 
-1. Fork 项目
-2. 在 GitHub repo Settings → Pages 中启用
-3. 设置分支为 `gh-pages` 或使用 Actions 自动部署
-4. 修改 `vite.config.ts` 中的 `base` 为你的路径
-
-### Vercel / Netlify
-
-直接导入项目即可，框架自动识别为 Vite。
+也可以部署到任意静态托管服务（Netlify、Cloudflare Pages 等），注意根据部署路径修改 `vite.config.ts` 中的 `base`。
 
 ## 📄 License
 
