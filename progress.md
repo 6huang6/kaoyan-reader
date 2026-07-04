@@ -1,23 +1,33 @@
 # Progress Log — 考研英语阅读辅助翻译工具
 
-## Session 2026-07-04
+## Session 2026-07-04 最终状态
 
-### 14:30 — 项目启动
-- 需求澄清完成
-- 设计文档已确认并存档：docs/superpowers/specs/2026-07-04-kaoyan-english-reader-design.md
-- 规划文件已创建：task_plan.md, findings.md, progress.md
+### 已完成
+- ✅ 项目设计 + 架构规划
+- ✅ React + Vite + Tailwind 搭建
+- ✅ Google Lens OCR（动态 import，按需加载）
+- ✅ 逐句翻译（跨行合并 + 缩写保护 + 段落检测）
+- ✅ 考研词汇标注（5415 词大纲词表）
+- ✅ 点击查词（中文释义 + 词性 + 常用释义）
+- ✅ 三段式逐句对照 + 整段译文（段落分块）
+- ✅ Lucide SVG 图标，学术暖调 UI
+- ✅ 双模式 API：Vercel Function 代理 + 本地直连 fallback
+- ✅ GitHub 仓库 + v1.0-stable 标签
 
-### 设计决策汇总
-| 决策 | 选择 |
+### 待完成
+- 🔲 Vercel 部署
+- 🔲 OCR.space API Key 设置
+- 🔲 清理不需要的组件文件（OriginalText, VocabPanel 旧版）
+
+### 关键文件
+| 文件 | 职责 |
 |------|------|
-| 成本 | 零成本 |
-| 架构 | Vercel 全栈（React + Serverless Function） |
-| OCR | Tesseract.js 浏览器端 |
-| 翻译 | 免费 API（优先 @vitalets/google-translate-api） |
-| 词汇 | 考研大纲词表（~5500 词） |
-| 布局 | 三段式（原文+译文+词汇面板） |
-| 视觉 | 学术暖调（米白+深蓝+暖橙） |
-| 上传 | 引导式 + 文本粘贴 |
+| src/services/ocr.ts | OCR: Vercel(/api/ocr) → Google Lens fallback |
+| src/services/translate.ts | 分句+翻译+查词 |
+| api/translate.ts | Vercel Function: Google Translate 代理 |
+| api/ocr.ts | Vercel Function: OCR.space 代理 |
+| public/vocab.json | 考研词汇表（5415词） |
 
-### 下一步
-进入 Phase 1: Foundation（Wave 1：Task 1, 2, 3 并行）
+### Git
+- 仓库: https://github.com/6huang6/kaoyan-reader
+- 标签: v1.0-stable
