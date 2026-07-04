@@ -13,7 +13,8 @@ export default function App() {
   }, [])
 
   const handleBack = useCallback(() => {
-    // 回到上传页但保留上次的结果？（如果需要完全重新开始则清空）
+    setResult(null)
+    setRawText(null)
   }, [])
 
   const handleNew = useCallback(() => {

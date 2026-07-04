@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { recognize, terminateWorker, type OcrProgress } from '../services/ocr'
+import { recognize, type OcrProgress } from '../services/ocr'
 
 export function useOcr() {
   const [ocrText, setOcrText] = useState<string | null>(null)
@@ -38,6 +38,5 @@ export function useOcr() {
     ocrError,
     runOcr,
     reset,
-    terminateWorker,
   }
 }

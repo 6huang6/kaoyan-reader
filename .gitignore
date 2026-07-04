@@ -4,3 +4,8 @@ dist
 .superpowers
 .playwright-mcp
 *.tsbuildinfo
+*.bak
+*.jpg
+*.png
+*.txt
+test-ocr*

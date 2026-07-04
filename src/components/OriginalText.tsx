@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { SentencePair } from '../types'
-import { lookupDictionary } from '../services/translate'
+import { lookupDictionary, type DictResult } from '../services/translate'
 import { lookupWord } from '../services/vocab'
 
 interface Props {
@@ -36,10 +36,11 @@ export default function OriginalText({ sentences }: Props) {
 
     // 非大纲词，调 API
     setLoadingWord(word)
-    const dictMeaning = await lookupDictionary(word)
+    const dictResult = await lookupDictionary(word)
     setLoadingWord(null)
 
-    if (dictMeaning) {
+    if (dictResult) {
+      const dictMeaning = dictResult.inContext?.meaning || dictResult.entries[0]?.meaning || '未找到'
       setPopup({
         word,
         meaning: dictMeaning,

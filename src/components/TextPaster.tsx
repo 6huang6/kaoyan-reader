@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ClipboardPaste, ArrowRight } from 'lucide-react'
 
 interface Props {
   onText: (text: string) => void
@@ -15,28 +16,47 @@ export default function TextPaster({ onText, disabled }: Props) {
   }
 
   return (
-    <div className="w-full">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-0.5 bg-warm-border flex-1" />
-        <span className="text-sm text-warm-muted font-medium">或者直接粘贴英文文本</span>
-        <div className="w-6 h-0.5 bg-warm-border flex-1" />
+    <div>
+      {/* 分隔线 */}
+      <div className="flex items-center gap-4 mb-5">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-sm text-gray-400 font-medium">或者直接粘贴文本</span>
+        <div className="flex-1 h-px bg-gray-200" />
       </div>
 
-      <textarea
-        className="w-full h-40 p-4 border-2 border-warm-border rounded-xl bg-white/50 resize-y focus:outline-none focus:border-warm-accent focus:bg-white transition-colors text-warm-text placeholder-warm-muted"
-        placeholder="在此粘贴英语阅读文章的文本内容...&#10;&#10;例如：&#10;The notion of artificial intelligence has captivated researchers for decades. However, recent breakthroughs in deep learning have propelled the field forward at an unprecedented pace."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        disabled={disabled}
-      />
+      {/* 粘贴区 */}
+      <div className="relative">
+        <textarea
+          className="w-full h-44 p-5 border-2 border-gray-200 rounded-2xl bg-white resize-y
+            focus:outline-none focus:border-warm-accent/40 focus:ring-4 focus:ring-warm-accent/5
+            transition-all text-warm-text text-[15px] leading-relaxed placeholder:text-gray-300"
+          placeholder="在此粘贴英语阅读文章的文本内容..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={disabled}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              handleSubmit()
+            }
+          }}
+        />
 
-      <button
-        className="mt-3 px-6 py-2.5 bg-warm-accent text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        onClick={handleSubmit}
-        disabled={disabled || !text.trim()}
-      >
-        ✨ 开始翻译
-      </button>
+        <button
+          className="absolute bottom-4 right-4 px-5 py-2 bg-warm-accent text-white rounded-xl text-sm font-medium
+            hover:bg-orange-600 transition-all duration-200 shadow-sm
+            disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
+          onClick={handleSubmit}
+          disabled={disabled || !text.trim()}
+        >
+          <span>开始翻译</span>
+          <ArrowRight size={14} />
+        </button>
+      </div>
+
+      <p className="text-xs text-warm-muted/50 mt-2 text-right">
+        <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-mono">Ctrl+Enter</kbd>
+        <span className="ml-1">快捷提交</span>
+      </p>
     </div>
   )
 }

@@ -1,14 +1,12 @@
 // === 翻译结果数据结构 ===
 
-/** 单个词的标注信息 */
 export interface WordAnnotation {
-  text: string       // 原词（保持原文大小写）
-  lemma: string      // 词元（小写，用于匹配和查询）
-  isVocab: boolean   // 是否考研大纲词汇
-  meaning?: string   // 中文释义（大纲词从 vocab.json 获取，非大纲词从 API 获取）
+  text: string
+  lemma: string
+  isVocab: boolean
+  meaning?: string
 }
 
-/** 单句的原文+译文+逐词标注 */
 export interface SentencePair {
   index: number
   en: string
@@ -16,35 +14,41 @@ export interface SentencePair {
   words: WordAnnotation[]
 }
 
-/** 完整翻译结果 */
-export interface TranslationResult {
+/** 段落：含序号、内部句子、整段译文 */
+export interface ParagraphPair {
+  index: number
   sentences: SentencePair[]
-  paragraphZh: string  // 整段连贯译文
+  zhParagraph: string  // 整个段落的连贯译文
 }
 
-// === OCR 相关 ===
+export interface TranslationResult {
+  paragraphs: ParagraphPair[]
+  paragraphZh: string
+}
+
+// === OCR ===
 
 export interface OcrState {
   status: 'idle' | 'loading' | 'success' | 'error'
-  progress: number   // 0-1
+  progress: number
   text: string | null
   error: string | null
 }
 
-// === 查词相关 ===
+// === 查词 ===
 
 export interface WordDefinition {
   word: string
   phonetic?: string
-  meanings: string[]  // 中文释义列表
+  meanings: string[]
 }
 
-// === 页面状态 ===
+// === 页面 ===
 
 export type AppPage = 'upload' | 'result'
 
 export interface AppState {
   page: AppPage
   result: TranslationResult | null
-  rawText: string | null  // OCR 识别后的原始文本
+  rawText: string | null
 }

@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback } from 'react'
+import { Upload, Camera, Image } from 'lucide-react'
 
 interface Props {
   onImage: (file: File) => void
@@ -6,7 +7,8 @@ interface Props {
 }
 
 export default function ImageUploader({ onImage, disabled }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
 
   const handleFile = useCallback(
@@ -34,60 +36,60 @@ export default function ImageUploader({ onImage, disabled }: Props) {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
       if (file) handleFile(file)
-      // 重置 input 以便同一文件可重复选择
       e.target.value = ''
     },
     [handleFile],
   )
 
   return (
-    <div className="w-full">
+    <div>
+      {/* 拖拽区 */}
       <div
-        className={`border-3 border-dashed rounded-2xl flex flex-col items-center justify-center p-12 cursor-pointer transition-all
-          ${dragOver ? 'border-warm-accent bg-warm-accent/5 scale-[1.02]' : 'border-warm-border bg-white/50 hover:border-warm-accent/50 hover:bg-white/80'}
+        className={`relative border-2 border-dashed rounded-2xl flex flex-col items-center justify-center py-16 px-6 cursor-pointer transition-all duration-200
+          ${dragOver
+            ? 'border-warm-accent bg-warm-accent/5 scale-[1.01]'
+            : 'border-gray-300 hover:border-warm-accent/40 hover:bg-white/60'
+          }
           ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => fileRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
       >
-        <div className="text-5xl mb-4">📷</div>
-        <div className="font-semibold text-warm-text text-lg mb-1">
-          {dragOver ? '松开即可上传' : '点击上传或拖拽图片到此处'}
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors
+          ${dragOver ? 'bg-warm-accent/10 text-warm-accent' : 'bg-gray-100 text-gray-400'}`}>
+          <Upload size={24} strokeWidth={1.5} />
         </div>
-        <div className="text-warm-muted text-sm">支持 JPG / PNG / WebP</div>
+        <p className="text-[15px] font-medium text-warm-text mb-1">
+          {dragOver ? '松开以上传图片' : '拖拽图片到此处，或点击上传'}
+        </p>
+        <p className="text-sm text-warm-muted">支持 JPG、PNG、WebP 格式</p>
       </div>
 
-      <div className="flex justify-center gap-4 mt-4">
+      {/* 按钮组 */}
+      <div className="flex justify-center gap-3 mt-5">
         <button
-          className="px-6 py-2.5 bg-warm-accent text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors shadow-sm"
-          onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+          className="px-5 py-2.5 bg-white border border-gray-200 text-warm-text rounded-xl text-sm font-medium
+            hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 inline-flex items-center gap-2"
+          onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }}
           disabled={disabled}
         >
-          📁 选择文件
+          <Image size={16} strokeWidth={1.5} />
+          选择文件
         </button>
         <button
-          className="px-6 py-2.5 bg-warm-text text-white rounded-lg font-semibold hover:bg-opacity-80 transition-colors shadow-sm"
-          onClick={(e) => {
-            e.stopPropagation()
-            // capture 属性触发手机相机
-            inputRef.current?.setAttribute('capture', 'environment')
-            inputRef.current?.click()
-            inputRef.current?.removeAttribute('capture')
-          }}
+          className="px-5 py-2.5 bg-warm-text text-white rounded-xl text-sm font-medium
+            hover:bg-warm-text/90 transition-all duration-200 inline-flex items-center gap-2 shadow-sm"
+          onClick={(e) => { e.stopPropagation(); cameraRef.current?.click() }}
           disabled={disabled}
         >
-          📷 拍照上传
+          <Camera size={16} strokeWidth={1.5} />
+          拍照上传
         </button>
       </div>
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleChange}
-      />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleChange} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleChange} />
     </div>
   )
 }
