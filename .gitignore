@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.superpowers
+.playwright-mcp
+*.tsbuildinfo
+*.bak
+*.jpg
+*.png
+*.txt
+test-ocr*
