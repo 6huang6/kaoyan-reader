@@ -1,12 +1,14 @@
 <div align="center">
   <h1>📖 考研英语阅读助手</h1>
-  <p><strong>OCR 识别 → 逐句翻译 → 词典标注，一站搞定考研英语阅读</strong></p>
+  <p><strong>OCR 识别 → 逐句翻译 → 词典标注，一站搞定考研英语阅读</strong><br>
+  <strong>🇨🇳 国内直连 · 无需 VPN</strong></p>
   <p>
     <img src="https://img.shields.io/badge/React-18-blue?logo=react" alt="React 18" />
     <img src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript" alt="TypeScript" />
     <img src="https://img.shields.io/badge/Vite-6-purple?logo=vite" alt="Vite 6" />
     <img src="https://img.shields.io/badge/Tailwind_CSS-3-cyan?logo=tailwindcss" alt="Tailwind CSS" />
     <img src="https://img.shields.io/badge/PWA-✓-green" alt="PWA" />
+    <img src="https://img.shields.io/badge/%F0%9F%87%A8%F0%9F%87%B3_%E5%9B%BD%E5%86%85%E7%9B%B4%E8%BF%9E-%E2%9C%93-brightgreen" alt="国内直连" />
   </p>
   <p>
     <a href="https://6huang6.github.io/kaoyan-reader">🌐 在线体验</a>
@@ -42,6 +44,7 @@
 | ✂️ 直接粘贴 | 已有电子版文本可直接粘贴翻译 |
 | 📱 PWA 支持 | 可安装到手机/桌面，离线缓存 |
 | 🔒 隐私安全 | 图片仅在浏览器本地处理，不上传服务器 |
+| 🇨🇳 国内直连 | 无需 VPN，OCR / 翻译全链路国内可用 |
 
 ## 🖼️ 截图
 
@@ -117,10 +120,10 @@ kaoyan-reader/
 
 ## 🏗️ 架构说明
 
-**纯前端应用**，不依赖后端服务器。OCR 和翻译通过第三方 API 实现：
+**纯前端应用**，不依赖后端服务器。OCR 和翻译通过第三方 API 实现，**国内网络环境下可直接使用，无需 VPN**：
 
-1. **OCR 识别**：图片压缩后发送到 OCR.space API，返回识别文本
-2. **翻译**：通过 Supabase Edge Function 代理 Google Translate（解决国内直接访问 Google 的限制）
+1. **OCR 识别**：图片压缩后发送到 OCR.space API（国内可直连），返回识别文本
+2. **翻译**：通过 Supabase Edge Function（部署在新加坡）代理 Google Translate，解决国内无法直接访问 Google 的问题
 3. **词典**：优先使用本地考研词表释义，查不到的通过翻译接口获取
 4. **词汇标注**：对所有单词做 lemma 还原（处理时态/复数/派生），匹配考研大纲词表
 
