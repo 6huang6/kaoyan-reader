@@ -29,7 +29,7 @@
 2. 🌐 **自动翻译** → 逐句对照，保留原文排版
 3. 📝 **考研词汇高亮** → 大纲词自动标注，点击查词典
 
-> 🎬 **演示视频：** (待上传 — 可放在 GitHub Release 或 B站)
+> 🎬 **[观看演示视频](https://github.com/6huang6/kaoyan-reader/releases/download/v2.0.0/%E6%BC%94%E7%A4%BA%E8%A7%86%E9%A2%91.mp4)** (3MB, MP4)
 
 ## ✨ 功能
 
