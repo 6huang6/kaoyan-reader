@@ -42,7 +42,9 @@ export async function recognize(
     const lens = new LensCore(undefined, fetch.bind(window))
     const result = await lens.scanByData(data, mime, [width, height])
 
-    const text = result.segments.map((s: { text: string }) => s.text).join('\n')
+    // 用坐标检测段落间距
+    const segs = result.segments as Array<{ text: string; boundingBox: { pixelCoords: { x: number; y: number; height: number } } }>
+    const text = joinWithParagraphs(segs)
 
     onProgress?.({ status: 'done', progress: 1 })
     if (text.trim().length < 5) {
@@ -89,6 +91,27 @@ function readImageData(file: File): Promise<{ data: Uint8Array; width: number; h
     img.onerror = () => reject(new Error('图片加载失败'))
     img.src = URL.createObjectURL(file)
   })
+}
+
+interface Segment {
+  text: string
+  boundingBox: { pixelCoords: { x: number; y: number; height: number } }
+}
+
+function joinWithParagraphs(segs: Segment[]): string {
+  if (segs.length <= 1) return segs.map(s => s.text).join('\n')
+
+  const xVals = segs.map(s => s.boundingBox.pixelCoords.x)
+  const baseX = xVals.sort((a, b) => a - b)[Math.floor(xVals.length / 2)]
+  const lines: string[] = [segs[0].text]
+
+  for (let i = 1; i < segs.length; i++) {
+    const isIndented = segs[i].boundingBox.pixelCoords.x > baseX + 15
+    const prevIsShort = segs[i - 1].text.trim().length < 20
+    if (isIndented || prevIsShort) lines.push('')
+    lines.push(segs[i].text)
+  }
+  return lines.join('\n')
 }
 
 export async function terminateWorker(): Promise<void> {}
