@@ -1,13 +1,31 @@
 node_modules
 dist
 .env
+
+# IDE / 缓存
 .superpowers
 .playwright-mcp
+.wrangler/
 *.tsbuildinfo
 *.bak
-*.jpg
-*.png
-*.txt
+
+# 开发过程文件
+/findings.md
+/progress.md
+/task_plan.md
+/docs/
+/worker/
+/functions/
+/supabase/.temp/
+
+# 测试文件 & 大文件
 test-ocr*
 vocab-full.json
 vocab-deployed.json
+*.jpg
+*.txt
+*.mp4
+
+# 图片全局忽略，但 screenshots/ 例外（用于 README）
+*.png
+!/screenshots/*.png
