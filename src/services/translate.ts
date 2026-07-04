@@ -93,8 +93,9 @@ export function splitSentences(text: string): string[] {
   return result
 }
 
-/** 翻译一句话：统一走 Vercel Function（国内可访问） */
+/** 翻译一句话：Vercel Function → Google 直连 */
 async function translateOne(text: string): Promise<string> {
+  // 方式 1：Vercel Function（国内可用）
   try {
     const resp = await fetch('/api/translate', {
       method: 'POST',
@@ -105,7 +106,22 @@ async function translateOne(text: string): Promise<string> {
       const data = await resp.json() as { zh: string }
       return data.zh
     }
-  } catch { /* Vercel Function 不可用 */ }
+  } catch { /* fallback */ }
+
+  // 方式 2：Google Translate 直连（本地 dev / VPN）
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`
+    const resp = await fetch(url)
+    if (resp.ok) {
+      const data = await resp.json() as unknown[][]
+      const parts: string[] = []
+      for (const block of data[0] as [string][]) {
+        if (block[0]) parts.push(block[0])
+      }
+      const result = parts.join('')
+      if (result) return result
+    }
+  } catch { /* fallback */ }
 
   return '[翻译失败]'
 }
@@ -337,8 +353,9 @@ async function fetchDict(word: string): Promise<DictEntry[]> {
   return entries.slice(0, 8) // 最多 8 条
 }
 
-/** 通过 Vercel Function 获取单词中文释义 */
+/** 获取单词中文释义：Vercel → Google 直连 */
 async function fetchGoogleMeaning(word: string): Promise<string | null> {
+  // Vercel Function
   try {
     const resp = await fetch('/api/translate', {
       method: 'POST',
@@ -347,7 +364,21 @@ async function fetchGoogleMeaning(word: string): Promise<string | null> {
     })
     if (resp.ok) {
       const data = await resp.json() as { zh: string }
-      return data.zh || null
+      if (data.zh) return data.zh
+    }
+  } catch { /* fallback */ }
+
+  // Google 直连
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(word)}`
+    const resp = await fetch(url)
+    if (resp.ok) {
+      const data = await resp.json() as unknown[][]
+      const parts: string[] = []
+      for (const block of data[0] as [string][]) {
+        if (block[0]) parts.push(block[0])
+      }
+      return parts.join('；') || null
     }
   } catch { /* fail */ }
   return null
