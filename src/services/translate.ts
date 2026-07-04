@@ -1,24 +1,6 @@
 import type { TranslationResult, SentencePair, WordAnnotation, ParagraphPair } from '../types'
 import { extractWords, annotateWords } from './vocab'
 
-// 自动检测 Vercel Function 是否可用（只检测一次）
-let vercelAvailable: boolean | null = null
-
-async function checkVercelAvailable(): Promise<boolean> {
-  if (vercelAvailable !== null) return vercelAvailable
-  try {
-    const resp = await fetch('/api/translate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'test' }),
-    })
-    vercelAvailable = resp.ok
-  } catch {
-    vercelAvailable = false
-  }
-  return vercelAvailable
-}
-
 /** 拆分中文句子（按 。！？），合并过短片段 */
 function splitChineseSentences(zh: string): string[] {
   if (!zh) return []
@@ -111,37 +93,19 @@ export function splitSentences(text: string): string[] {
   return result
 }
 
-/** 翻译一句话：Vercel → Google → 失败提示 */
+/** 翻译一句话：统一走 Vercel Function（国内可访问） */
 async function translateOne(text: string): Promise<string> {
-  // 方式 1：Vercel Function（生产环境）
-  if (await checkVercelAvailable()) {
-    try {
-      const resp = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      if (resp.ok) {
-        const data = await resp.json() as { zh: string }
-        return data.zh
-      }
-    } catch { /* fall through */ }
-  }
-
-  // 方式 2：Google Translate
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`
-    const resp = await fetch(url)
+    const resp = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
     if (resp.ok) {
-      const data = await resp.json() as unknown[][]
-      const parts: string[] = []
-      for (const block of data[0] as [string][]) {
-        if (block[0]) parts.push(block[0])
-      }
-      const result = parts.join('')
-      if (result) return result
+      const data = await resp.json() as { zh: string }
+      return data.zh
     }
-  } catch { /* fall through */ }
+  } catch { /* Vercel Function 不可用 */ }
 
   return '[翻译失败]'
 }
@@ -373,16 +337,18 @@ async function fetchDict(word: string): Promise<DictEntry[]> {
   return entries.slice(0, 8) // 最多 8 条
 }
 
-/** Google Translate 获取单词中文释义（文中含义） */
+/** 通过 Vercel Function 获取单词中文释义 */
 async function fetchGoogleMeaning(word: string): Promise<string | null> {
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(word)}`
-  const resp = await fetch(url)
-  if (!resp.ok) return null
-
-  const data = await resp.json() as unknown[][]
-  const parts: string[] = []
-  for (const block of data[0] as [string][]) {
-    if (block[0]) parts.push(block[0])
-  }
-  return parts.join('；') || null
+  try {
+    const resp = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: word }),
+    })
+    if (resp.ok) {
+      const data = await resp.json() as { zh: string }
+      return data.zh || null
+    }
+  } catch { /* fail */ }
+  return null
 }
