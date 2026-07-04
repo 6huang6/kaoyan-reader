@@ -5,6 +5,8 @@ export interface WordAnnotation {
   lemma: string
   isVocab: boolean
   meaning?: string
+  pos?: string
+  vocabEntries?: Array<{ pos: string; meaning: string }>
 }
 
 export interface SentencePair {

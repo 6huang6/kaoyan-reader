@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { ArrowLeft, Plus } from 'lucide-react'
-import { lookupDictionary, type DictResult } from '../services/translate'
+import { lookupDictionary, type DictResult, type DictEntry } from '../services/translate'
 import { lookupWord } from '../services/vocab'
 import type { TranslationResult, SentencePair } from '../types'
 
@@ -159,7 +159,7 @@ function SentenceRow({ sentence: s }: { sentence: SentencePair }) {
 // ─── 英文单词渲染（考研词下划线 + 点击查词） ───
 
 function renderEnWords(sentence: SentencePair): React.ReactNode[] {
-  const parts = sentence.en.split(/(\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b)/g)
+  const parts = sentence.en.split(/(\b[a-zA-Z]+(?:['-][a-zA-Z]+)*\b)/g)
 
   return parts.map((part, i) => {
     const word = sentence.words.find(
@@ -174,30 +174,39 @@ function renderEnWords(sentence: SentencePair): React.ReactNode[] {
 function ClickableWord({ word }: { word: SentencePair['words'][number] }) {
   const [dict, setDict] = useState<DictResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const cancelRef = useRef(false)
+
+  // 关闭弹窗时取消未完成的请求
+  const closeDict = useCallback(() => {
+    cancelRef.current = true
+    setDict(null)
+  }, [])
 
   const handleClick = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (dict) { setDict(null); return }
+    if (dict) { closeDict(); return }
 
-    // 先检查本地词表（大纲词的快速释义）
-    const local = await lookupWord(word.text)
+    cancelRef.current = false
+    const cancelled = () => cancelRef.current
 
+    // 大纲词：本地释义 + 文中释义 + 独立词性
+    if (word.isVocab && word.vocabEntries) {
+      const entries: DictEntry[] = word.vocabEntries.map(e => ({
+        pos: e.pos,
+        meaning: e.meaning,
+      }))
+      const contextMeaning = entries[0]?.meaning?.split(/[；;]/)[0] || ''
+      setDict({ entries, inContext: { pos: '', meaning: contextMeaning } })
+      return
+    }
+
+    // 非大纲词：查词典
     setLoading(true)
     const result = await lookupDictionary(word.text)
+    if (cancelled()) { setLoading(false); return }
     setLoading(false)
-
-    if (result) {
-      // 如果有大纲词释义，优先作为文中释义
-      if (local && !result.inContext) {
-        result.inContext = { pos: '', meaning: local }
-      }
-      setDict(result)
-    } else if (local) {
-      setDict({ entries: [], inContext: { pos: '', meaning: local } })
-    } else {
-      setDict({ entries: [], inContext: { pos: '', meaning: '未找到释义' } })
-    }
-  }, [word, dict])
+    setDict(result || { entries: [], inContext: { pos: '', meaning: '未找到释义' } })
+  }, [word, dict, closeDict])
 
   return (
     <span className="relative inline">
@@ -215,7 +224,7 @@ function ClickableWord({ word }: { word: SentencePair['words'][number] }) {
       </span>
 
       {dict && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={() => setDict(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={() => closeDict()}>
           <div
             className="bg-white rounded-2xl shadow-2xl w-[320px] max-h-[75vh] overflow-y-auto border border-warm-border"
             style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}
@@ -276,7 +285,7 @@ function ClickableWord({ word }: { word: SentencePair['words'][number] }) {
               {/* 关闭 */}
               <button
                 className="w-full text-center text-xs text-warm-muted hover:text-warm-accent transition-colors pt-1"
-                onClick={() => setDict(null)}
+                onClick={() => closeDict()}
               >
                 点击空白处关闭
               </button>

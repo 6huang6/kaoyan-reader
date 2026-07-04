@@ -9,3 +9,5 @@ dist
 *.png
 *.txt
 test-ocr*
+vocab-full.json
+vocab-deployed.json

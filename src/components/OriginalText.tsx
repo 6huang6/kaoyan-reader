@@ -90,7 +90,7 @@ function renderWords(
   loadingWord: string | null,
 ): React.ReactNode[] {
   // 用正则拆分句子，保留标点和空格
-  const parts = sentence.en.split(/(\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b)/g)
+  const parts = sentence.en.split(/(\b[a-zA-Z]+(?:['-][a-zA-Z]+)*\b)/g)
 
   return parts.map((part, i) => {
     const word = sentence.words.find(
