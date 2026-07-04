@@ -1,65 +1,9 @@
-import { LensCore } from '@rxliuli/chrome-lens-ocr/core'
-
 export interface OcrProgress {
   status: 'idle' | 'loading' | 'recognizing' | 'done' | 'error'
   progress: number
 }
 
-// 将 File 转为 Uint8Array + 获取图片尺寸
-function readFileData(file: File): Promise<{ data: Uint8Array; width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-
-    img.onload = async () => {
-      const w = img.naturalWidth
-      const h = img.naturalHeight
-      URL.revokeObjectURL(url)
-
-      const buffer = await file.arrayBuffer()
-      resolve({ data: new Uint8Array(buffer), width: w, height: h })
-    }
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('图片加载失败'))
-    }
-    img.src = url
-  })
-}
-
-/** 根据 segment 坐标插入段落分隔符（段首缩进检测） */
-function joinWithParagraphs(result: { segments: Array<{ text: string; boundingBox: { pixelCoords: { x: number; y: number; height: number } } }> }): string {
-  const segs = result.segments
-  if (segs.length <= 1) return segs.map(s => s.text).join('\n')
-
-  // 计算最常见左边界（正文行基准 x）
-  const xValues = segs.map(s => s.boundingBox.pixelCoords.x)
-  const avgX = xValues.reduce((a, b) => a + b, 0) / xValues.length
-
-  // 统计：最接近 avgX 的区间是正文基准
-  const baseX = xValues.sort((a, b) => a - b)[Math.floor(xValues.length / 2)]
-
-  const lines: string[] = [segs[0].text]
-
-  for (let i = 1; i < segs.length; i++) {
-    const currX = segs[i].boundingBox.pixelCoords.x
-    const prevIsShort = segs[i - 1].text.trim().length < 20
-
-    // 段首条件：x 明显大于基准（缩进 ≥ 15px）或前一行很短（上一段结束）
-    const isIndented = currX > baseX + 15
-    const isNewPara = isIndented || prevIsShort
-
-    if (isNewPara) {
-      lines.push('', segs[i].text)
-    } else {
-      lines.push(segs[i].text)
-    }
-  }
-
-  return lines.join('\n')
-}
-
+/** OCR 识别：浏览器压缩 → Vercel Function → OCR.space API（国内无需 VPN） */
 export async function recognize(
   file: File,
   onProgress?: (p: OcrProgress) => void,
@@ -67,41 +11,71 @@ export async function recognize(
   onProgress?.({ status: 'loading', progress: 0 })
 
   try {
-    onProgress?.({ status: 'loading', progress: 0.3 })
-    const { data, width, height } = await readFileData(file)
+    // 预处理：缩放 + 压缩 + base64
+    onProgress?.({ status: 'loading', progress: 0.1 })
+    const base64 = await compressToBase64(file, 1500, 0.75)
 
-    onProgress?.({ status: 'recognizing', progress: 0.5 })
+    // 调用 Vercel Function
+    onProgress?.({ status: 'recognizing', progress: 0.3 })
+    const resp = await fetch('/api/ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64 }),
+    })
 
-    const lens = new LensCore(undefined, fetch.bind(window))
-    const mime = (file.type && ['image/jpeg','image/png','image/webp','image/bmp'].includes(file.type))
-      ? file.type as 'image/jpeg'
-      : 'image/jpeg'
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: 'OCR 失败' }))
+      throw new Error(err.error || 'OCR 服务异常')
+    }
 
-    const result = await lens.scanByData(data, mime, [width, height])
-
+    const data = await resp.json() as { text: string }
     onProgress?.({ status: 'done', progress: 1 })
 
-    // 用坐标检测段落间距：相邻 segment 垂直间距 > 平均行高 1.5 倍 → 段落边界
-    const text = joinWithParagraphs(result)
-    if (!text.trim() || text.trim().length < 5) {
-      return '[OCR 未能识别到有效文本，请尝试重新拍摄]'
+    if (!data.text || data.text.trim().length < 5) {
+      return '[OCR 未能识别到有效文本，请重新拍摄或粘贴文本]'
     }
 
-    return text
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
+    return data.text.trim()
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'OCR 识别失败'
-
-    // 区分网络错误
-    if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
-      throw new Error('Google Lens 连接失败，请确认代理已开启（端口 7897）或检查网络')
-    }
-
-    throw new Error(`OCR 失败: ${msg}`)
+    throw new Error(msg)
   }
 }
 
-export async function terminateWorker(): Promise<void> {
-  // Google Lens OCR 无需清理
+/** 压缩图片并返回 base64（去掉 data URI 前缀） */
+function compressToBase64(file: File, maxWidth: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const ratio = Math.min(1, maxWidth / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * ratio)
+      canvas.height = Math.round(img.height * ratio)
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('Canvas 不可用')); return }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { reject(new Error('压缩失败')); return }
+          const reader = new FileReader()
+          reader.onload = () => {
+            const dataUrl = reader.result as string
+            // 去掉 "data:image/jpeg;base64," 前缀
+            resolve(dataUrl.split(',')[1])
+          }
+          reader.onerror = () => reject(new Error('读取失败'))
+          reader.readAsDataURL(blob)
+        },
+        'image/jpeg',
+        quality,
+      )
+    }
+    img.onerror = () => reject(new Error('图片加载失败'))
+    img.src = URL.createObjectURL(file)
+  })
 }
+
+export async function terminateWorker(): Promise<void> {}
