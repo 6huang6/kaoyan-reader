@@ -1,8 +1,8 @@
 {
-  "functions": {
-    "api/translate.ts": {
-      "memory": 256,
-      "maxDuration": 10
-    }
-  }
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
+  ]
 }

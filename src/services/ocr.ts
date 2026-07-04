@@ -3,34 +3,48 @@ export interface OcrProgress {
   progress: number
 }
 
-/** OCR 识别：Vercel Function → 失败则直连 Google Lens */
+/** OCR 识别：OCR.space 直连 → Google Lens（VPN 用户 fallback） */
 export async function recognize(
   file: File,
   onProgress?: (p: OcrProgress) => void,
 ): Promise<string> {
   onProgress?.({ status: 'loading', progress: 0 })
 
-  // 方式 1：Vercel Function → OCR.space（生产环境 + 国内用户）
+  // 方式 1：OCR.space 直连（国内可用，无需代理）
   try {
     const base64 = await compressToBase64(file, 1500, 0.75)
     onProgress?.({ status: 'recognizing', progress: 0.3 })
 
-    const resp = await fetch('/api/ocr', {
+    const formData = new URLSearchParams()
+    formData.append('apikey', 'helloworld')
+    formData.append('base64Image', `data:image/jpeg;base64,${base64}`)
+    formData.append('language', 'eng')
+    formData.append('OCREngine', '2')
+    formData.append('isOverlayRequired', 'false')
+    formData.append('scale', 'true')
+
+    const resp = await fetch('https://api.ocr.space/parse/image', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64 }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
     })
 
     if (resp.ok) {
-      const data = await resp.json() as { text: string }
-      if (data.text && data.text.trim().length >= 5) {
-        onProgress?.({ status: 'done', progress: 1 })
-        return data.text.trim()
+      const data = await resp.json() as {
+        ParsedResults?: Array<{ ParsedText: string }>
+        ErrorMessage?: string
+      }
+      if (!data.ErrorMessage) {
+        const text = data.ParsedResults?.map(r => r.ParsedText).join('\n') || ''
+        if (text.trim().length >= 5) {
+          onProgress?.({ status: 'done', progress: 1 })
+          return text.trim()
+        }
       }
     }
-  } catch { /* 本地 dev 无 Vercel Function，fallback */ }
+  } catch { /* fallback */ }
 
-  // 方式 2：Google Lens 直连（本地 dev / VPN 用户）
+  // 方式 2：Google Lens 直连（仅 VPN 用户可用）
   try {
     onProgress?.({ status: 'recognizing', progress: 0.3 })
     const { LensCore } = await import('@rxliuli/chrome-lens-ocr/core')
@@ -42,7 +56,6 @@ export async function recognize(
     const lens = new LensCore(undefined, fetch.bind(window))
     const result = await lens.scanByData(data, mime, [width, height])
 
-    // 用坐标检测段落间距
     const segs = result.segments as Array<{ text: string; boundingBox: { pixelCoords: { x: number; y: number; height: number } } }>
     const text = joinWithParagraphs(segs)
 

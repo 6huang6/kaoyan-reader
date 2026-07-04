@@ -1,24 +1,6 @@
 import type { TranslationResult, SentencePair, WordAnnotation, ParagraphPair } from '../types'
 import { extractWords, annotateWords } from './vocab'
 
-// 自动检测 Vercel Function 是否可用（只检测一次）
-let vercelAvailable: boolean | null = null
-
-async function checkVercelAvailable(): Promise<boolean> {
-  if (vercelAvailable !== null) return vercelAvailable
-  try {
-    const resp = await fetch('/api/translate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'test' }),
-    })
-    vercelAvailable = resp.ok
-  } catch {
-    vercelAvailable = false
-  }
-  return vercelAvailable
-}
-
 /** 不以句号结尾的常见缩写 */
 const ABBREVIATIONS = /\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|Co|Inc|Ltd|St|Ave|vs|etc|e\.g|i\.e)\.$/i
 
@@ -79,24 +61,9 @@ export function splitSentences(text: string): string[] {
   return result
 }
 
-/** 翻译一句话：Vercel → MyMemory → Google → 失败提示 */
+/** 翻译一句话：MyMemory（国内可用）→ Google Translate（VPN）→ 失败提示 */
 async function translateOne(text: string): Promise<string> {
-  // 方式 1：Vercel Function（生产环境）
-  if (await checkVercelAvailable()) {
-    try {
-      const resp = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      if (resp.ok) {
-        const data = await resp.json() as { zh: string }
-        return data.zh
-      }
-    } catch { /* fall through */ }
-  }
-
-  // 方式 2：MyMemory（免费，无需 key，稳定）
+  // 方式 1：MyMemory（免费，国内直连）
   try {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|zh`
     const resp = await fetch(url)
@@ -108,7 +75,7 @@ async function translateOne(text: string): Promise<string> {
     }
   } catch { /* fall through */ }
 
-  // 方式 3：Google Translate
+  // 方式 2：Google Translate（仅 VPN 用户可用）
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`
     const resp = await fetch(url)
@@ -126,23 +93,48 @@ async function translateOne(text: string): Promise<string> {
   return '[翻译失败]'
 }
 
-/** 清理 OCR 结果：过滤中文/标题/纯数字行，保留段落空行 */
-function cleanOcrOutput(text: string): string {
-  return text
-    .split('\n')
-    .map(line => {
-      const t = line.trim()
-      if (!t) return '' // 空行保留（段落分隔）
-      if (/[一-鿿]/.test(t)) return ''
-      if (/^(Passage|Section|Text|Part)\s+\d+/i.test(t)) return ''
-      if (/^\d+$/.test(t)) return ''
-      const letters = (t.match(/[a-zA-Z]/g) || []).length
-      if (letters === 0) return ''
-      return line
-    })
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+/** 判断是否为噪声行（页眉页脚/引用标记/OCR 乱码） */
+function isNoiseLine(raw: string): boolean {
+  const t = raw.trim()
+  if (!t) return false // 空行不是噪声，用于段落分隔
+  if (/[一-鿿]/.test(t)) return true
+  if (/^(Passage|Section|Text|Part)\s+\d+/i.test(t)) return true
+  if (/^\d+$/.test(t)) return true
+  if (/^\[\d+[A-Z]?\]/.test(t) && t.length < 12) return true
+  if (/\(\s*#\s*\d+/.test(t) && t.length < 50) return true
+  if (/^\d{4}\s+[A-Z0-9]{3,}/.test(t) && t.length < 40) return true
+  if (/[，。；：、》《【】]/.test(t)) return true
+  const letters = (t.match(/[a-zA-Z]/g) || []).length
+  return letters === 0
+}
+
+/** 按段首缩进拆分段落：行首有空格 → 新段开始 */
+function splitParagraphs(lines: string[]): string[] {
+  const paragraphs: string[] = []
+  let current: string[] = []
+
+  for (const raw of lines) {
+    const t = raw.trim()
+    if (!t) {
+      // 空行：结束当前段落
+      if (current.length > 0) {
+        paragraphs.push(current.join(' '))
+        current = []
+      }
+      continue
+    }
+
+    // 行首有空格 → 新段开始（英文印刷体段首缩进）
+    if (/^ +/.test(raw) && current.length > 0) {
+      paragraphs.push(current.join(' '))
+      current = [t]
+    } else {
+      current.push(t)
+    }
+  }
+
+  if (current.length > 0) paragraphs.push(current.join(' '))
+  return paragraphs
 }
 
 /** 翻译所有句子并标注词汇，按段落分组 */
@@ -150,10 +142,12 @@ export async function translateAndAnnotate(
   rawText: string,
   onSentenceProgress?: (done: number, total: number) => void,
 ): Promise<TranslationResult> {
-  const cleanedText = cleanOcrOutput(rawText)
+  // 1. 过滤噪声行
+  const rawLines = rawText.split('\n')
+  const cleanLines = rawLines.filter(l => !isNoiseLine(l))
 
-  // 按段落拆分
-  const paraTexts = cleanedText.split(/\n\n+/).filter(p => p.trim())
+  // 2. 按段首缩进 + 空行分段
+  const paraTexts = splitParagraphs(cleanLines)
   if (paraTexts.length === 0) {
     return { paragraphs: [], paragraphZh: '' }
   }
@@ -167,8 +161,8 @@ export async function translateAndAnnotate(
   const wordAnnotations = await annotateWords(allWords)
 
   const paragraphPairs: ParagraphPair[] = []
-  const allSentencePairs: SentencePair[] = []
   let globalIdx = 0
+  const batchSize = 2
 
   // 逐段处理
   for (let pi = 0; pi < paraTexts.length; pi++) {
@@ -176,16 +170,20 @@ export async function translateAndAnnotate(
     if (sentences.length === 0) continue
 
     const pairs: SentencePair[] = []
-    const batchSize = 3
 
     for (let start = 0; start < sentences.length; start += batchSize) {
       const batch = sentences.slice(start, start + batchSize)
+      // 2 句并发翻译
       const results = await Promise.all(
         batch.map(async (en) => {
           try { return await translateOne(en) }
           catch { return '[翻译失败]' }
         }),
       )
+      // 批次间延迟，避免 429
+      if (start + batchSize < sentences.length) {
+        await new Promise(r => setTimeout(r, 400))
+      }
 
       for (let j = 0; j < batch.length; j++) {
         const en = batch[j]
@@ -199,18 +197,15 @@ export async function translateAndAnnotate(
 
         const pair: SentencePair = { index: globalIdx, en, zh, words }
         pairs.push(pair)
-        allSentencePairs.push(pair)
         globalIdx++
         onSentenceProgress?.(globalIdx, totalSentences)
       }
     }
 
-    // 段落整段译文：合并本段各句译文
     const zhParagraph = pairs.map(s => s.zh).join('')
     paragraphPairs.push({ index: pi, sentences: pairs, zhParagraph })
   }
 
-  // 全文整段译文
   const paragraphZh = paragraphPairs.map(p => p.zhParagraph).join('\n\n')
 
   return { paragraphs: paragraphPairs, paragraphZh }
@@ -285,15 +280,20 @@ async function fetchDict(word: string): Promise<DictEntry[]> {
 
 async function translateDefinitions(entries: DictEntry[]): Promise<DictEntry[]> {
   if (entries.length === 0) return []
-  const separator = ' ||| '
-  const combined = entries.map(e => e.meaning).join(separator)
-  try {
-    const zh = await translateOne(combined)
-    if (zh === '[翻译失败]') return entries.map(e => ({ pos: translatePos(e.pos), meaning: e.meaning }))
-    const zhParts = zh.split(/\s*\|\|\|\s*/)
-    return entries.map((e, i) => ({
-      pos: translatePos(e.pos),
-      meaning: zhParts[i] || e.meaning,
-    }))
-  } catch { return entries.map(e => ({ pos: translatePos(e.pos), meaning: e.meaning })) }
+  // 逐条翻译，避免拼接过长触发 MyMemory 500 字符限制
+  const results: string[] = []
+  for (const e of entries) {
+    try {
+      const zh = await translateOne(e.meaning)
+      results.push(zh !== '[翻译失败]' ? zh : e.meaning)
+    } catch { results.push(e.meaning) }
+    // 避免 429
+    if (results.length < entries.length) {
+      await new Promise(r => setTimeout(r, 200))
+    }
+  }
+  return entries.map((e, i) => ({
+    pos: translatePos(e.pos),
+    meaning: results[i],
+  }))
 }
